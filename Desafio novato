@@ -1,0 +1,375 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+/* =========================
+   MÓDULO 1 — WAR: TERRITÓRIOS
+   ========================= */
+typedef struct {
+    char nome[30];
+    char cor[10];
+    int tropas;
+} Territorio;
+
+/*
+  moduloWar:
+  - Lê 5 territórios com nome, cor e tropas usando fgets e scanf.
+  - Exibe a lista ao final do cadastro.
+*/
+void moduloWar() {
+    Territorio territorios[5];
+    int i;
+
+    printf("\n=== Cadastro de Territórios - Jogo War ===\n\n");
+
+    for (i = 0; i < 5; i++) {
+        printf("Digite o nome do território %d: ", i + 1);
+        fgets(territorios[i].nome, sizeof(territorios[i].nome), stdin);
+        territorios[i].nome[strcspn(territorios[i].nome, "\n")] = '\0';
+
+        printf("Digite a cor do exército: ");
+        fgets(territorios[i].cor, sizeof(territorios[i].cor), stdin);
+        territorios[i].cor[strcspn(territorios[i].cor, "\n")] = '\0';
+
+        printf("Digite a quantidade de tropas: ");
+        scanf("%d", &territorios[i].tropas);
+        getchar(); // consome o '\n' residual do scanf
+        printf("\n");
+    }
+
+    printf("\n=== Lista de Territórios Cadastrados ===\n");
+    for (i = 0; i < 5; i++) {
+        printf("Nome: %s | Cor: %s | Tropas: %d\n",
+               territorios[i].nome, territorios[i].cor, territorios[i].tropas);
+    }
+}
+
+/* =========================
+   MÓDULO 2 — INVENTÁRIO
+   ========================= */
+typedef struct {
+    char nome[30];
+    char tipo[20];
+    int quantidade;
+} Item;
+
+Item mochila[10];
+int totalItens = 0;
+
+/*
+  inserirItem:
+  - Insere um item no próximo índice livre se houver espaço.
+*/
+void inserirItem() {
+    if (totalItens >= 10) {
+        printf("Mochila cheia!\n");
+        return;
+    }
+    printf("Nome do item: ");
+    fgets(mochila[totalItens].nome, sizeof(mochila[totalItens].nome), stdin);
+    mochila[totalItens].nome[strcspn(mochila[totalItens].nome, "\n")] = '\0';
+
+    printf("Tipo do item: ");
+    fgets(mochila[totalItens].tipo, sizeof(mochila[totalItens].tipo), stdin);
+    mochila[totalItens].tipo[strcspn(mochila[totalItens].tipo, "\n")] = '\0';
+
+    printf("Quantidade: ");
+    scanf("%d", &mochila[totalItens].quantidade);
+    getchar(); // consome '\n'
+
+    totalItens++;
+    printf("Item adicionado!\n");
+}
+
+/*
+  removerItem:
+  - Remove o primeiro item com o nome informado (deslocando os demais).
+*/
+void removerItem() {
+    char nome[30];
+    printf("Digite o nome do item a remover: ");
+    fgets(nome, sizeof(nome), stdin);
+    nome[strcspn(nome, "\n")] = '\0';
+
+    for (int i = 0; i < totalItens; i++) {
+        if (strcmp(mochila[i].nome, nome) == 0) {
+            for (int j = i; j < totalItens - 1; j++) {
+                mochila[j] = mochila[j + 1];
+            }
+            totalItens--;
+            printf("Item removido!\n");
+            return;
+        }
+    }
+    printf("Item não encontrado.\n");
+}
+
+/*
+  listarItens:
+  - Lista todos os itens presentes na mochila.
+*/
+void listarItens() {
+    printf("\n=== Itens na Mochila ===\n");
+    if (totalItens == 0) {
+        printf("(sem itens)\n");
+        return;
+    }
+    for (int i = 0; i < totalItens; i++) {
+        printf("%s | Tipo: %s | Quantidade: %d\n",
+               mochila[i].nome, mochila[i].tipo, mochila[i].quantidade);
+    }
+}
+
+/*
+  buscarItem:
+  - Busca sequencial por nome e exibe os dados se encontrar.
+*/
+void buscarItem() {
+    char nome[30];
+    printf("Digite o nome do item a buscar: ");
+    fgets(nome, sizeof(nome), stdin);
+    nome[strcspn(nome, "\n")] = '\0';
+
+    for (int i = 0; i < totalItens; i++) {
+        if (strcmp(mochila[i].nome, nome) == 0) {
+            printf("Encontrado: %s | Tipo: %s | Quantidade: %d\n",
+                   mochila[i].nome, mochila[i].tipo, mochila[i].quantidade);
+            return;
+        }
+    }
+    printf("Item não encontrado.\n");
+}
+
+/*
+  moduloInventario:
+  - Menu simples com inserir, remover, listar e buscar.
+*/
+void moduloInventario() {
+    int opc;
+    do {
+        printf("\n=== Inventário ===\n");
+        printf("1 - Inserir item\n2 - Remover item\n3 - Listar itens\n4 - Buscar item\n0 - Sair\nEscolha: ");
+        if (scanf("%d", &opc) != 1) {
+            // entrada inválida: limpa e continua
+            while (getchar() != '\n');
+            opc = -1;
+            continue;
+        }
+        getchar(); // consome '\n'
+
+        switch (opc) {
+            case 1: inserirItem(); break;
+            case 2: removerItem(); break;
+            case 3: listarItens(); break;
+            case 4: buscarItem(); break;
+            case 0: printf("Voltando ao menu principal...\n"); break;
+            default: printf("Opção inválida.\n"); break;
+        }
+    } while (opc != 0);
+}
+
+/* =========================
+   MÓDULO 3 — TETRIS STACK
+   ========================= */
+typedef struct {
+    char nome; // 'I', 'O', 'T', 'L'
+    int id;    // identificador único
+} Peca;
+
+#define MAX_FILA 10
+Peca fila[MAX_FILA];
+int frente = 0, tras = -1, qtd = 0, idCounter = 0;
+
+char tiposPeca[] = {'I', 'O', 'T', 'L'};
+
+/*
+  gerarPeca:
+  - Gera uma peça com tipo aleatório e id único crescente.
+*/
+Peca gerarPeca() {
+    Peca p;
+    p.nome = tiposPeca[rand() % 4];
+    p.id = idCounter++;
+    return p;
+}
+
+/*
+  enqueue:
+  - Insere peça no final (fila circular) se houver espaço.
+*/
+void enqueue() {
+    if (qtd == MAX_FILA) {
+        printf("Fila cheia!\n");
+        return;
+    }
+    tras = (tras + 1) % MAX_FILA;
+    fila[tras] = gerarPeca();
+    qtd++;
+}
+
+/*
+  dequeue:
+  - Remove a peça da frente (se existir).
+*/
+void dequeue() {
+    if (qtd == 0) {
+        printf("Fila vazia!\n");
+        return;
+    }
+    frente = (frente + 1) % MAX_FILA;
+    qtd--;
+}
+
+/*
+  mostrarFila:
+  - Exibe todas as peças na ordem FIFO.
+*/
+void mostrarFila() {
+    printf("Fila de peças: ");
+    if (qtd == 0) {
+        printf("(vazia)");
+    } else {
+        for (int i = 0; i < qtd; i++) {
+            int idx = (frente + i) % MAX_FILA;
+            printf("[%c %d] ", fila[idx].nome, fila[idx].id);
+        }
+    }
+    printf("\n");
+}
+
+/*
+  moduloTetris:
+  - Inicializa a fila com 5 peças e oferece menu para jogar/inserir.
+*/
+void moduloTetris() {
+    // inicia com 5 peças
+    for (int i = 0; i < 5; i++) enqueue();
+    int opc;
+    do {
+        mostrarFila();
+        printf("1 - Jogar peça (dequeue)\n2 - Inserir nova peça (enqueue)\n0 - Sair\nEscolha: ");
+        if (scanf("%d", &opc) != 1) {
+            while (getchar() != '\n');
+            opc = -1;
+            continue;
+        }
+        getchar(); // consome '\n'
+        if (opc == 1) dequeue();
+        else if (opc == 2) enqueue();
+        else if (opc == 0) printf("Voltando ao menu principal...\n");
+        else printf("Opção inválida.\n");
+    } while (opc != 0);
+}
+
+/* =========================
+   MÓDULO 4 — DETECTIVE QUEST
+   ========================= */
+typedef struct Sala {
+    char nome[50];
+    struct Sala *esq;
+    struct Sala *dir;
+} Sala;
+
+/*
+  criarSala:
+  - Aloca dinamicamente uma sala com nome.
+*/
+Sala* criarSala(const char *nome) {
+    Sala *nova = (Sala*) malloc(sizeof(Sala));
+    if (!nova) {
+        printf("Falha ao alocar memória para a sala.\n");
+        exit(EXIT_FAILURE);
+    }
+    strncpy(nova->nome, nome, sizeof(nova->nome) - 1);
+    nova->nome[sizeof(nova->nome) - 1] = '\0';
+    nova->esq = nova->dir = NULL;
+    return nova;
+}
+
+/*
+  liberarArvore:
+  - Libera recursivamente toda a árvore de salas.
+*/
+void liberarArvore(Sala *raiz) {
+    if (!raiz) return;
+    liberarArvore(raiz->esq);
+    liberarArvore(raiz->dir);
+    free(raiz);
+}
+
+/*
+  explorarSalas:
+  - Permite navegação (e/d/s) até alcançar nó-folha ou sair.
+*/
+void explorarSalas(Sala *atual) {
+    char escolha;
+    while (atual != NULL) {
+        printf("Você está em: %s\n", atual->nome);
+        if (atual->esq == NULL && atual->dir == NULL) {
+            printf("Fim do caminho!\n");
+            break;
+        }
+        printf("Escolha (e) esquerda, (d) direita, (s) sair: ");
+        if (scanf(" %c", &escolha) != 1) {
+            while (getchar() != '\n');
+            continue;
+        }
+        if (escolha == 'e' || escolha == 'E') atual = atual->esq;
+        else if (escolha == 'd' || escolha == 'D') atual = atual->dir;
+        else if (escolha == 's' || escolha == 'S') break;
+        else printf("Opção inválida.\n");
+    }
+}
+
+/*
+  moduloDetective:
+  - Monta manualmente a árvore e inicia a exploração.
+*/
+void moduloDetective() {
+    Sala *hall = criarSala("Hall de Entrada");
+    hall->esq = criarSala("Sala de Estar");
+    hall->dir = criarSala("Cozinha");
+    hall->esq->esq = criarSala("Biblioteca");
+    hall->esq->dir = criarSala("Jardim");
+    hall->dir->esq = criarSala("Despensa");
+    hall->dir->dir = criarSala("Garagem");
+
+    explorarSalas(hall);
+    liberarArvore(hall);
+}
+
+/* =========================
+   FUNÇÃO PRINCIPAL
+   ========================= */
+int main() {
+    int opc;
+    srand((unsigned)time(NULL));
+
+    do {
+        printf("\n=== MENU PRINCIPAL ===\n");
+        printf("1 - Módulo War (Territórios)\n");
+        printf("2 - Módulo Inventário\n");
+        printf("3 - Módulo Tetris Stack\n");
+        printf("4 - Módulo Detective Quest\n");
+        printf("0 - Sair\nEscolha: ");
+        if (scanf("%d", &opc) != 1) {
+            while (getchar() != '\n'); // limpa entrada inválida
+            opc = -1;
+            continue;
+        }
+        getchar(); // consome '\n'
+
+        switch (opc) {
+            case 1: moduloWar(); break;
+            case 2: moduloInventario(); break;
+            case 3: moduloTetris(); break;
+            case 4: moduloDetective(); break;
+            case 0: printf("Saindo...\n"); break;
+            default: printf("Opção inválida.\n"); break;
+        }
+    } while (opc != 0);
+
+    return 0;
+}
+}
