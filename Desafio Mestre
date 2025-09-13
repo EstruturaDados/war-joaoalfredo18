@@ -1,0 +1,535 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+void limpar() { int c; while ((c = getchar()) != '\n' && c != EOF) {} }
+
+typedef struct {
+    char nome[30];
+    char cor[10];
+    int tropas;
+} Territorio;
+
+char* dupStr(const char* s) {
+    size_t n = strlen(s) + 1;
+    char* p = (char*)malloc(n);
+    if (!p) exit(1);
+    memcpy(p, s, n);
+    return p;
+}
+
+void atribuirMissao(char* destino, char* missoes[], int total) {
+    int idx = rand() % total;
+    strcpy(destino, missoes[idx]);
+}
+
+Territorio* criarMapa(int* n) {
+    printf("Quantidade de territorios: ");
+    if (scanf("%d", n) != 1 || *n <= 0) { limpar(); *n = 6; }
+    limpar();
+    Territorio* mapa = (Territorio*)calloc(*n, sizeof(Territorio));
+    if (!mapa) exit(1);
+    for (int i = 0; i < *n; i++) {
+        printf("Nome do territorio %d: ", i);
+        fgets(mapa[i].nome, sizeof(mapa[i].nome), stdin);
+        mapa[i].nome[strcspn(mapa[i].nome, "\n")] = 0;
+        printf("Cor do exercito: ");
+        fgets(mapa[i].cor, sizeof(mapa[i].cor), stdin);
+        mapa[i].cor[strcspn(mapa[i].cor, "\n")] = 0;
+        printf("Tropas: ");
+        scanf("%d", &mapa[i].tropas);
+        limpar();
+        if (mapa[i].tropas < 0) mapa[i].tropas = 0;
+    }
+    return mapa;
+}
+
+void exibirMapa(const Territorio* mapa, int n) {
+    printf("\nMapa:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%d) %s | %s | %d\n", i, mapa[i].nome, mapa[i].cor, mapa[i].tropas);
+    }
+}
+
+void atacarWar(Territorio* atacante, Territorio* defensor) {
+    int da = (rand() % 6) + 1;
+    int dd = (rand() % 6) + 1;
+    printf("Dados: A=%d D=%d\n", da, dd);
+    if (da > dd) {
+        strncpy(defensor->cor, atacante->cor, sizeof(defensor->cor)-1);
+        defensor->cor[sizeof(defensor->cor)-1] = 0;
+        defensor->tropas = atacante->tropas / 2;
+        if (defensor->tropas < 1) defensor->tropas = 1;
+        printf("Vitoria do atacante. %s agora e %s com %d tropas.\n", defensor->nome, defensor->cor, defensor->tropas);
+    } else if (da < dd) {
+        if (atacante->tropas > 0) atacante->tropas -= 1;
+        printf("Defesa bem-sucedida. Tropas do atacante: %d\n", atacante->tropas);
+    } else {
+        printf("Empate. Sem mudancas.\n");
+    }
+}
+
+int contarPorCor(Territorio* mapa, int n, const char* cor) {
+    int c = 0;
+    for (int i = 0; i < n; i++) if (strcmp(mapa[i].cor, cor) == 0) c++;
+    return c;
+}
+
+int totalTropasDaCor(Territorio* mapa, int n, const char* cor) {
+    int soma = 0;
+    for (int i = 0; i < n; i++) if (strcmp(mapa[i].cor, cor) == 0) soma += mapa[i].tropas;
+    return soma;
+}
+
+int verificarMissao(char* missao, Territorio* mapa, int n) {
+    if (strstr(missao, "Conquistar 3 territorios") != NULL) {
+        for (int i = 0; i < n; i++) if (mapa[i].tropas >= 1) return 0;
+        return 0;
+    }
+    if (strstr(missao, "Eliminar todas as tropas da cor vermelha") != NULL) {
+        for (int i = 0; i < n; i++) if (strcmp(mapa[i].cor, "vermelha") == 0 && mapa[i].tropas > 0) return 0;
+        return 1;
+    }
+    if (strstr(missao, "Controlar pelo menos 2 territorios") != NULL) {
+        char alvo[10] = "azul";
+        if (contarPorCor(mapa, n, alvo) >= 2) return 1; else return 0;
+    }
+    if (strstr(missao, "Ter mais de 10 tropas somadas") != NULL) {
+        char alvo[10] = "azul";
+        if (totalTropasDaCor(mapa, n, alvo) > 10) return 1; else return 0;
+    }
+    if (strstr(missao, "Conquistar o Hall") != NULL) {
+        for (int i = 0; i < n; i++) if (strcmp(mapa[i].nome, "Hall") == 0 && mapa[i].tropas > 0) return 1;
+        return 0;
+    }
+    return 0;
+}
+
+void liberarWar(Territorio* mapa, char* m1, char* m2) {
+    free(mapa);
+    free(m1);
+    free(m2);
+}
+
+void moduloWarMissoes() {
+    int n;
+    Territorio* mapa = criarMapa(&n);
+    char* missoes[] = {
+        "Eliminar todas as tropas da cor vermelha",
+        "Controlar pelo menos 2 territorios",
+        "Ter mais de 10 tropas somadas",
+        "Conquistar o Hall",
+        "Conquistar 3 territorios seguidos"
+    };
+    int total = sizeof(missoes)/sizeof(missoes[0]);
+    char* missaoJog1 = (char*)malloc(120);
+    char* missaoJog2 = (char*)malloc(120);
+    if (!missaoJog1 || !missaoJog2) exit(1);
+    atribuirMissao(missaoJog1, missoes, total);
+    atribuirMissao(missaoJog2, missoes, total);
+    printf("\nJogador 1 missao: %s\n", missaoJog1);
+    printf("Jogador 2 missao: %s\n", missaoJog2);
+    int turno = 1;
+    while (1) {
+        exibirMapa(mapa, n);
+        printf("\nTurno de %s\n", turno == 1 ? "Jogador 1 (cor azul)" : "Jogador 2 (cor vermelha)");
+        int ia, id;
+        printf("Indice atacante: ");
+        if (scanf("%d", &ia) != 1) { limpar(); continue; }
+        printf("Indice defensor: ");
+        if (scanf("%d", &id) != 1) { limpar(); continue; }
+        limpar();
+        if (ia < 0 || ia >= n || id < 0 || id >= n || ia == id) { printf("Indices invalidos.\n"); continue; }
+        if (strcmp(mapa[ia].cor, mapa[id].cor) == 0) { printf("Ataque invalido: mesma cor.\n"); continue; }
+        atacarWar(&mapa[ia], &mapa[id]);
+        int v1 = verificarMissao(missaoJog1, mapa, n);
+        int v2 = verificarMissao(missaoJog2, mapa, n);
+        if (v1) { printf("\nVitoria do Jogador 1!\n"); break; }
+        if (v2) { printf("\nVitoria do Jogador 2!\n"); break; }
+        turno = 3 - turno;
+        int sair;
+        printf("0 para continuar, 1 para encerrar: ");
+        if (scanf("%d", &sair) != 1) { limpar(); sair = 0; }
+        limpar();
+        if (sair) break;
+    }
+    liberarWar(mapa, missaoJog1, missaoJog2);
+}
+
+typedef struct {
+    char nome[30];
+    char tipo[20];
+    int prioridade;
+} Componente;
+
+void mostrarComponentes(Componente a[], int n) {
+    for (int i = 0; i < n; i++)
+        printf("%02d) %s | %s | %d\n", i, a[i].nome, a[i].tipo, a[i].prioridade);
+}
+
+void bubbleSortNome(Componente a[], int n, long* comps) {
+    *comps = 0;
+    for (int i = 0; i < n-1; i++)
+        for (int j = 0; j < n-1-i; j++) {
+            (*comps)++;
+            if (strcmp(a[j].nome, a[j+1].nome) > 0) {
+                Componente t = a[j]; a[j] = a[j+1]; a[j+1] = t;
+            }
+        }
+}
+
+void insertionSortTipo(Componente a[], int n, long* comps) {
+    *comps = 0;
+    for (int i = 1; i < n; i++) {
+        Componente key = a[i];
+        int j = i - 1;
+        while (j >= 0 && (++(*comps), strcmp(a[j].tipo, key.tipo) > 0)) {
+            a[j+1] = a[j];
+            j--;
+        }
+        a[j+1] = key;
+    }
+}
+
+void selectionSortPrioridade(Componente a[], int n, long* comps) {
+    *comps = 0;
+    for (int i = 0; i < n-1; i++) {
+        int min = i;
+        for (int j = i+1; j < n; j++) {
+            (*comps)++;
+            if (a[j].prioridade < a[min].prioridade) min = j;
+        }
+        if (min != i) { Componente t = a[i]; a[i] = a[min]; a[min] = t; }
+    }
+}
+
+int buscaBinariaPorNome(Componente a[], int n, const char* chave, long* comps) {
+    *comps = 0;
+    int l = 0, r = n - 1;
+    while (l <= r) {
+        int m = (l + r) / 2;
+        (*comps)++;
+        int c = strcmp(a[m].nome, chave);
+        if (c == 0) return m;
+        if (c < 0) l = m + 1; else r = m - 1;
+    }
+    return -1;
+}
+
+void moduloInventarioOrdenacoes() {
+    Componente v[20];
+    int n;
+    printf("Quantidade de componentes (max 20): ");
+    if (scanf("%d", &n) != 1 || n < 1 || n > 20) { limpar(); n = 6; } else limpar();
+    for (int i = 0; i < n; i++) {
+        printf("Nome: "); fgets(v[i].nome, sizeof(v[i].nome), stdin); v[i].nome[strcspn(v[i].nome, "\n")] = 0;
+        printf("Tipo: "); fgets(v[i].tipo, sizeof(v[i].tipo), stdin); v[i].tipo[strcspn(v[i].tipo, "\n")] = 0;
+        printf("Prioridade (1..10): "); if (scanf("%d", &v[i].prioridade) != 1) { limpar(); v[i].prioridade = 5; } else limpar();
+        if (v[i].prioridade < 1) v[i].prioridade = 1;
+        if (v[i].prioridade > 10) v[i].prioridade = 10;
+    }
+    int op = -1;
+    while (op != 0) {
+        printf("\n1-Bubble por nome 2-Insertion por tipo 3-Selection por prioridade 4-Busca binaria por nome 5-Mostrar 0-Sair\nEscolha: ");
+        if (scanf("%d", &op) != 1) { limpar(); op = -1; continue; } else limpar();
+        if (op == 1) {
+            Componente cpy[20]; memcpy(cpy, v, sizeof(Componente)*n);
+            long comps; clock_t t0 = clock(); bubbleSortNome(cpy, n, &comps); clock_t t1 = clock();
+            printf("Ordenado por nome. Comparacoes: %ld Tempo: %.6f s\n", comps, (double)(t1-t0)/CLOCKS_PER_SEC);
+            mostrarComponentes(cpy, n);
+            memcpy(v, cpy, sizeof(Componente)*n);
+        } else if (op == 2) {
+            Componente cpy[20]; memcpy(cpy, v, sizeof(Componente)*n);
+            long comps; clock_t t0 = clock(); insertionSortTipo(cpy, n, &comps); clock_t t1 = clock();
+            printf("Ordenado por tipo. Comparacoes: %ld Tempo: %.6f s\n", comps, (double)(t1-t0)/CLOCKS_PER_SEC);
+            mostrarComponentes(cpy, n);
+            memcpy(v, cpy, sizeof(Componente)*n);
+        } else if (op == 3) {
+            Componente cpy[20]; memcpy(cpy, v, sizeof(Componente)*n);
+            long comps; clock_t t0 = clock(); selectionSortPrioridade(cpy, n, &comps); clock_t t1 = clock();
+            printf("Ordenado por prioridade. Comparacoes: %ld Tempo: %.6f s\n", comps, (double)(t1-t0)/CLOCKS_PER_SEC);
+            mostrarComponentes(cpy, n);
+            memcpy(v, cpy, sizeof(Componente)*n);
+        } else if (op == 4) {
+            Componente cpy[20]; memcpy(cpy, v, sizeof(Componente)*n);
+            long compsO; bubbleSortNome(cpy, n, &compsO);
+            char chave[30]; printf("Componente-chave (nome): "); fgets(chave, sizeof(chave), stdin); chave[strcspn(chave, "\n")] = 0;
+            long comps; int idx = buscaBinariaPorNome(cpy, n, chave, &comps);
+            if (idx >= 0) printf("Encontrado em %d | Comparacoes: %ld\n", idx, comps);
+            else printf("Nao encontrado | Comparacoes: %ld\n", comps);
+        } else if (op == 5) {
+            mostrarComponentes(v, n);
+        }
+    }
+}
+
+typedef struct {
+    char nome;
+    int id;
+} Peca;
+
+#define QF 5
+#define QP 3
+
+typedef struct {
+    Peca a[QF];
+    int frente, tras, qtd;
+} FilaP;
+
+typedef struct {
+    Peca a[QP];
+    int topo;
+} PilhaP;
+
+char tiposP[] = {'I','O','T','L'};
+int idGen = 0;
+
+Peca gerarPeca() { Peca p; p.nome = tiposP[rand()%4]; p.id = idGen++; return p; }
+
+void filaInit(FilaP* f) { f->frente = 0; f->tras = -1; f->qtd = 0; }
+int filaCheiaP(FilaP* f){ return f->qtd==QF; }
+int filaVaziaP(FilaP* f){ return f->qtd==0; }
+void enqueueP(FilaP* f, Peca x){ if(filaCheiaP(f))return; f->tras=(f->tras+1)%QF; f->a[f->tras]=x; f->qtd++; }
+Peca dequeueP(FilaP* f, int* ok){ Peca z={'?',-1}; *ok=0; if(filaVaziaP(f))return z; z=f->a[f->frente]; f->frente=(f->frente+1)%QF; f->qtd--; *ok=1; return z; }
+
+void pilhaInit(PilhaP* p){ p->topo=-1; }
+int pilhaCheiaP(PilhaP* p){ return p->topo==QP-1; }
+int pilhaVaziaP(PilhaP* p){ return p->topo==-1; }
+int pushP(PilhaP* p, Peca x){ if(pilhaCheiaP(p))return 0; p->a[++p->topo]=x; return 1; }
+Peca popP(PilhaP* p, int* ok){ Peca z={'?',-1}; *ok=0; if(pilhaVaziaP(p))return z; z=p->a[p->topo--]; *ok=1; return z; }
+Peca topoP(PilhaP* p, int* ok){ Peca z={'?',-1}; *ok=0; if(pilhaVaziaP(p))return z; *ok=1; return p->a[p->topo]; }
+
+void mostrarEstadoTP(FilaP* f, PilhaP* p){
+    printf("\nEstado atual:\n");
+    printf("Fila de pecas\t");
+    if(f->qtd==0) printf("(vazia)");
+    else {
+        for(int i=0;i<f->qtd;i++){ int idx=(f->frente+i)%QF; printf("[%c %d] ", f->a[idx].nome, f->a[idx].id); }
+    }
+    printf("\nPilha de reserva\t(Topo -> base): ");
+    if(p->topo<0) printf("(vazia)");
+    else { for(int i=p->topo;i>=0;i--) printf("[%c %d] ", p->a[i].nome, p->a[i].id); }
+    printf("\n");
+}
+
+void trocarFrenteTopo(FilaP* f, PilhaP* p){
+    if(filaVaziaP(f) || pilhaVaziaP(p)) { printf("Nao e possivel trocar.\n"); return; }
+    int idx = f->frente;
+    Peca tmp = f->a[idx];
+    f->a[idx] = p->a[p->topo];
+    p->a[p->topo] = tmp;
+    printf("Troca atual realizada.\n");
+}
+
+void trocarTres(FilaP* f, PilhaP* p){
+    if(f->qtd < 3 || p->topo+1 < 3){ printf("Nao e possivel trocar 3.\n"); return; }
+    for(int k=0;k<3;k++){
+        int idx = (f->frente + k) % QF;
+        Peca tmp = f->a[idx];
+        f->a[idx] = p->a[p->topo - k];
+        p->a[p->topo - k] = tmp;
+    }
+    printf("Troca multipla realizada.\n");
+}
+
+void moduloTetrisAvancado(){
+    FilaP f; PilhaP p;
+    filaInit(&f); pilhaInit(&p);
+    for(int i=0;i<QF;i++) enqueueP(&f, gerarPeca());
+    int op=-1;
+    while(op!=0){
+        mostrarEstadoTP(&f,&p);
+        printf("\n1-Jogar 2-Reservar 3-Usar reserva 4-Trocar atual 5-Trocar 3 0-Sair\nEscolha: ");
+        if(scanf("%d",&op)!=1){ limpar(); op=-1; continue; } else limpar();
+        if(op==1){
+            int ok; Peca j = dequeueP(&f,&ok);
+            if(!ok) printf("Fila vazia.\n"); else { printf("Jogou [%c %d]\n", j.nome, j.id); enqueueP(&f, gerarPeca()); }
+        } else if(op==2){
+            if(pilhaCheiaP(&p)) printf("Pilha cheia.\n");
+            else { int ok; Peca m = dequeueP(&f,&ok); if(!ok) printf("Fila vazia.\n"); else { pushP(&p,m); printf("Reservou [%c %d]\n", m.nome, m.id); enqueueP(&f, gerarPeca()); } }
+        } else if(op==3){
+            int ok; Peca u = popP(&p,&ok);
+            if(!ok) printf("Reserva vazia.\n"); else printf("Usou reserva [%c %d]\n", u.nome, u.id);
+        } else if(op==4){
+            trocarFrenteTopo(&f,&p);
+        } else if(op==5){
+            trocarTres(&f,&p);
+        } else if(op==0){
+            printf("Encerrando modulo.\n");
+        } else {
+            printf("Opcao invalida.\n");
+        }
+    }
+}
+
+typedef struct Sala {
+    char nome[50];
+    struct Sala* esq;
+    struct Sala* dir;
+} Sala;
+
+typedef struct BST {
+    char pista[80];
+    struct BST* esq;
+    struct BST* dir;
+} BST;
+
+typedef struct HNode {
+    char chave[80];
+    char suspeito[40];
+    struct HNode* prox;
+} HNode;
+
+#define HTAM 101
+
+unsigned hashStr(const char* s) {
+    unsigned h=5381; int c;
+    while((c=*s++)) h=((h<<5)+h)+c;
+    return h % HTAM;
+}
+
+void hashIns(HNode** ht, const char* chave, const char* suspeito) {
+    unsigned h = hashStr(chave);
+    HNode* n = (HNode*)malloc(sizeof(HNode));
+    if(!n) exit(1);
+    strncpy(n->chave, chave, sizeof(n->chave)-1); n->chave[sizeof(n->chave)-1]=0;
+    strncpy(n->suspeito, suspeito, sizeof(n->suspeito)-1); n->suspeito[sizeof(n->suspeito)-1]=0;
+    n->prox = ht[h]; ht[h] = n;
+}
+
+const char* hashGet(HNode** ht, const char* chave) {
+    unsigned h = hashStr(chave);
+    for(HNode* p=ht[h]; p; p=p->prox) if(strcmp(p->chave,chave)==0) return p->suspeito;
+    return NULL;
+}
+
+void hashFree(HNode** ht) {
+    for(int i=0;i<HTAM;i++){ HNode* p=ht[i]; while(p){ HNode* nx=p->prox; free(p); p=nx; } ht[i]=NULL; }
+}
+
+BST* bstIns(BST* r, const char* pista) {
+    if(!pista || !pista[0]) return r;
+    if(!r){ BST* n=(BST*)malloc(sizeof(BST)); if(!n) exit(1); strncpy(n->pista,pista,sizeof(n->pista)-1); n->pista[sizeof(n->pista)-1]=0; n->esq=n->dir=NULL; return n; }
+    int c = strcmp(pista, r->pista);
+    if(c<0) r->esq = bstIns(r->esq, pista);
+    else if(c>0) r->dir = bstIns(r->dir, pista);
+    return r;
+}
+
+void bstPrint(BST* r) {
+    if(!r) return;
+    bstPrint(r->esq);
+    printf("- %s\n", r->pista);
+    bstPrint(r->dir);
+}
+
+void bstFree(BST* r) {
+    if(!r) return; bstFree(r->esq); bstFree(r->dir); free(r);
+}
+
+Sala* criarSalaN(const char* nome) {
+    Sala* s=(Sala*)malloc(sizeof(Sala)); if(!s) exit(1);
+    strncpy(s->nome,nome,sizeof(s->nome)-1); s->nome[sizeof(s->nome)-1]=0; s->esq=s->dir=NULL; return s;
+}
+
+void liberarMapaSala(Sala* r){ if(!r)return; liberarMapaSala(r->esq); liberarMapaSala(r->dir); free(r); }
+
+const char* pistaDaSala(const char* nome) {
+    if(strcmp(nome,"Hall de Entrada")==0) return "Pegadas de lama";
+    if(strcmp(nome,"Sala de Estar")==0) return "Relogio parado";
+    if(strcmp(nome,"Cozinha")==0) return "Faca ausente";
+    if(strcmp(nome,"Biblioteca")==0) return "Livro fora de lugar";
+    if(strcmp(nome,"Jardim")==0) return "Flor pisoteada";
+    if(strcmp(nome,"Despensa")==0) return "Embalagem rasgada";
+    if(strcmp(nome,"Garagem")==0) return "Rastro de pneu";
+    return "";
+}
+
+void popularHashSuspeitos(HNode** ht) {
+    hashIns(ht, "Pegadas de lama", "Carlos");
+    hashIns(ht, "Relogio parado", "Marina");
+    hashIns(ht, "Faca ausente", "Ana");
+    hashIns(ht, "Livro fora de lugar", "Carlos");
+    hashIns(ht, "Flor pisoteada", "Marina");
+    hashIns(ht, "Embalagem rasgada", "Ana");
+    hashIns(ht, "Rastro de pneu", "Carlos");
+}
+
+int verificarSuspeitoFinal(HNode** ht, BST* pistas, const char* acusado) {
+    if(!pistas) return 0;
+    int count = 0;
+    if(pistas->esq) count += verificarSuspeitoFinal(ht, pistas->esq, acusado);
+    const char* s = hashGet(ht, pistas->pista);
+    if(s && strcmp(s, acusado)==0) count++;
+    if(pistas->dir) count += verificarSuspeitoFinal(ht, pistas->dir, acusado);
+    return count;
+}
+
+void moduloDetectiveMestre() {
+    Sala* hall = criarSalaN("Hall de Entrada");
+    hall->esq = criarSalaN("Sala de Estar");
+    hall->dir = criarSalaN("Cozinha");
+    hall->esq->esq = criarSalaN("Biblioteca");
+    hall->esq->dir = criarSalaN("Jardim");
+    hall->dir->esq = criarSalaN("Despensa");
+    hall->dir->dir = criarSalaN("Garagem");
+
+    HNode* hashTable[HTAM]; for(int i=0;i<HTAM;i++) hashTable[i]=NULL;
+    popularHashSuspeitos(hashTable);
+
+    BST* coletadas = NULL;
+    Sala* atual = hall;
+    char op=' ';
+    while (1) {
+        printf("\nVoce esta em: %s\n", atual->nome);
+        const char* pista = pistaDaSala(atual->nome);
+        if (pista && pista[0]) {
+            printf("Pista encontrada: %s\n", pista);
+            coletadas = bstIns(coletadas, pista);
+        } else {
+            printf("Sem pista nesta sala.\n");
+        }
+        printf("Escolha (e) esquerda, (d) direita, (s) sair: ");
+        if (scanf(" %c", &op) != 1) { limpar(); continue; } else limpar();
+        if (op=='e' || op=='E') { if(atual->esq) atual=atual->esq; else printf("Sem caminho a esquerda.\n"); }
+        else if (op=='d' || op=='D') { if(atual->dir) atual=atual->dir; else printf("Sem caminho a direita.\n"); }
+        else if (op=='s' || op=='S') break;
+        else printf("Opcao invalida.\n");
+    }
+
+    printf("\nPistas coletadas (ordem):\n");
+    if (!coletadas) printf("(nenhuma)\n"); else bstPrint(coletadas);
+
+    char acusado[40];
+    printf("\nQuem e o culpado? ");
+    fgets(acusado, sizeof(acusado), stdin); acusado[strcspn(acusado, "\n")] = 0;
+    int cont = verificarSuspeitoFinal(hashTable, coletadas, acusado);
+    if (cont >= 2) printf("Acusacao procede. Pistas suficientes (%d).\n", cont);
+    else printf("Acusacao fraca. Pistas insuficientes (%d).\n", cont);
+
+    liberarMapaSala(hall);
+    bstFree(coletadas);
+    hashFree(hashTable);
+}
+
+int main() {
+    srand((unsigned)time(NULL));
+    int op=-1;
+    while (op != 0) {
+        printf("\n=== Projeto Mestre ===\n");
+        printf("1 - War: Missoes estrategicas\n");
+        printf("2 - Inventario: Ordenacoes e busca binaria\n");
+        printf("3 - Tetris: Fila + Pilha com trocas\n");
+        printf("4 - Detective Quest: Mapa + BST + Hash\n");
+        printf("0 - Sair\nEscolha: ");
+        if (scanf("%d", &op) != 1) { limpar(); op=-1; continue; } else limpar();
+        if (op == 1) moduloWarMissoes();
+        else if (op == 2) moduloInventarioOrdenacoes();
+        else if (op == 3) moduloTetrisAvancado();
+        else if (op == 4) moduloDetectiveMestre();
+        else if (op == 0) printf("Encerrando...\n");
+        else printf("Opcao invalida.\n");
+    }
+    return 0;
+}
